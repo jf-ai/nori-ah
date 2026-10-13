@@ -116,12 +116,12 @@ pub(crate) fn spinner_frame_at(animation_origin: Instant, now: Instant) -> &'sta
 
 /// Compose the terminal title string.
 ///
-/// When `spinner_frame` is `Some`, the title is `"{spinner} {project}"`.
-/// When `None`, the title is just `"{project}"`.
-pub(crate) fn compose_title(project_name: &str, spinner_frame: Option<&str>) -> String {
+/// When `spinner_frame` is `Some`, the title is `"{spinner} {title_text}"`.
+/// When `None`, the title is just `"{title_text}"`.
+pub(crate) fn compose_title(title_text: &str, spinner_frame: Option<&str>) -> String {
     match spinner_frame {
-        Some(frame) => format!("{frame} {project_name}"),
-        None => project_name.to_string(),
+        Some(frame) => format!("{frame} {title_text}"),
+        None => title_text.to_string(),
     }
 }
 
