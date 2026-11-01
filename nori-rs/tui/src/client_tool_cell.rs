@@ -593,7 +593,11 @@ const CMD_CONTINUATION_MAX: usize = 2;
 const OUTPUT_INITIAL_PREFIX: &str = "  └ ";
 const OUTPUT_SUBSEQUENT_PREFIX: &str = "    ";
 const OUTPUT_PREFIX_WIDTH: usize = 4;
-const OUTPUT_MAX_LINES: usize = 5;
+// Final cap on lines shown in an Execute cell's output. Keep in sync with
+// TOOL_CALL_MAX_LINES in exec_cell/render.rs: raising only this one still
+// leaves the head/tail pass capped at the other constant.
+// TODO: make configurable (`[tui] tool_output_lines`); tracked for a nori issue.
+const OUTPUT_MAX_LINES: usize = 15;
 
 fn exit_code_success(snapshot: &crate::presentation::ToolSnapshot) -> Option<bool> {
     if let Some(exit_code) = extract_exit_code(snapshot) {

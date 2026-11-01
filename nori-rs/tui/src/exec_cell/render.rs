@@ -7,7 +7,11 @@ use ratatui::prelude::*;
 use ratatui::style::Modifier;
 use ratatui::style::Stylize;
 
-pub(crate) const TOOL_CALL_MAX_LINES: usize = 5;
+// Lines kept from each end before the "... +N lines" marker. Keep in sync with
+// OUTPUT_MAX_LINES in client_tool_cell.rs: the final middle-truncation caps the
+// cell at that line count, so raising only one of the two has no effect.
+// TODO: make configurable (`[tui] tool_output_lines`); tracked for a nori issue.
+pub(crate) const TOOL_CALL_MAX_LINES: usize = 15;
 
 pub(crate) struct OutputLinesParams {
     pub(crate) line_limit: usize,
