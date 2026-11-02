@@ -173,37 +173,31 @@ impl ClientToolCell {
         while i < snapshots.len() {
             let snap = &snapshots[i];
 
-            // Group consecutive reads by filename
+            // Group consecutive reads, one sub-line per file.
             if snap.kind == crate::presentation::ToolKind::Read {
-                let mut names: Vec<String> = Vec::new();
-                if let Some(crate::presentation::Invocation::Read { path }) = &snap.invocation {
-                    names.push(read_display_name(path));
-                } else {
-                    names.push(relativize_paths_in_text(&snap.title, &self.cwd));
-                }
+                let mut reads: Vec<&crate::presentation::ToolSnapshot> = vec![snap];
                 let mut j = i + 1;
                 while j < snapshots.len()
                     && snapshots[j].kind == crate::presentation::ToolKind::Read
                 {
-                    let next = &snapshots[j];
-                    if let Some(crate::presentation::Invocation::Read { path }) = &next.invocation {
-                        names.push(read_display_name(path));
-                    } else {
-                        names.push(relativize_paths_in_text(&next.title, &self.cwd));
-                    }
+                    reads.push(&snapshots[j]);
                     j += 1;
                 }
                 i = j;
 
-                // Build "Read file1.rs, file2.rs" line
-                let mut spans: Vec<Span<'static>> = vec!["Read".cyan(), " ".into()];
-                for (idx, path) in names.into_iter().enumerate() {
-                    if idx > 0 {
-                        spans.push(", ".dim());
+                for (idx, read) in reads.into_iter().enumerate() {
+                    let mut spans: Vec<Span<'static>> = Vec::new();
+                    if idx == 0 {
+                        spans.push("Read".cyan());
+                        spans.push(" ".into());
+                    } else {
+                        // Align continuation files under the first file name.
+                        spans.push("     ".into());
                     }
-                    spans.push(path.into());
+                    spans.push(read_display_path(read, &self.cwd).into());
+                    push_line_range(&mut spans, read);
+                    sub_items.push(Line::from(spans));
                 }
-                sub_items.push(Line::from(spans));
                 continue;
             }
 
@@ -222,6 +216,7 @@ impl ClientToolCell {
                             relativize_paths_in_text(&p.display().to_string(), &self.cwd).into(),
                         );
                     }
+                    push_result_count(&mut spans, snap);
                     sub_items.push(Line::from(spans));
                 } else if let Some(crate::presentation::Invocation::ListFiles { path }) =
                     &snap.invocation
@@ -234,11 +229,13 @@ impl ClientToolCell {
                     }
                     sub_items.push(Line::from(spans));
                 } else {
-                    sub_items.push(Line::from(vec![
+                    let mut spans: Vec<Span<'static>> = vec![
                         "Search".cyan(),
                         " ".into(),
                         relativize_paths_in_text(&snap.title, &self.cwd).into(),
-                    ]));
+                    ];
+                    push_result_count(&mut spans, snap);
+                    sub_items.push(Line::from(spans));
                 }
                 i += 1;
                 continue;
@@ -828,13 +825,54 @@ impl HistoryCell for ClientToolCell {
     }
 }
 
-/// Extract a display name for a Read path: use the file name (basename) when
-/// available, falling back to the full path display. This matches the Codex
-/// ExecCell exploring style where Read items show just the filename.
-fn read_display_name(path: &std::path::Path) -> String {
-    path.file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.display().to_string())
+/// Display path for a Read item: cwd-relative when possible, so the file is
+/// still identifiable when several reads share a basename.
+fn read_display_path(snap: &crate::presentation::ToolSnapshot, cwd: &std::path::Path) -> String {
+    match &snap.invocation {
+        Some(crate::presentation::Invocation::Read { path }) => {
+            relativize_paths_in_text(&path.display().to_string(), cwd)
+        }
+        _ => relativize_paths_in_text(&snap.title, cwd),
+    }
+}
+
+/// Append the line range an adapter reported in `rawOutput.lines`, if present:
+/// `{"lines": {"start": 5, "end": 19, "total": 240}}`.
+fn push_line_range(spans: &mut Vec<Span<'static>>, snap: &crate::presentation::ToolSnapshot) {
+    let Some(lines) = snap.raw_output.as_ref().and_then(|out| out.get("lines")) else {
+        return;
+    };
+    let (Some(start), Some(end)) = (
+        lines.get("start").and_then(serde_json::Value::as_u64),
+        lines.get("end").and_then(serde_json::Value::as_u64),
+    ) else {
+        return;
+    };
+    spans.push(" \u{00b7} ".dim());
+    match lines.get("total").and_then(serde_json::Value::as_u64) {
+        Some(total) => spans.push(format!("lines {start}-{end} of {total}").dim()),
+        None => spans.push(format!("lines {start}-{end}").dim()),
+    }
+}
+
+/// Append the result count an adapter reported in `rawOutput.count`, if present.
+fn push_result_count(spans: &mut Vec<Span<'static>>, snap: &crate::presentation::ToolSnapshot) {
+    let Some(count) = snap
+        .raw_output
+        .as_ref()
+        .and_then(|out| out.get("count"))
+        .and_then(serde_json::Value::as_u64)
+    else {
+        return;
+    };
+    spans.push(" \u{00b7} ".dim());
+    spans.push(
+        match count {
+            1 => "1 result".to_string(),
+            n => format!("{n} results"),
+        }
+        .dim(),
+    );
 }
 
 fn is_active_phase(phase: &crate::presentation::ToolPhase) -> bool {
@@ -1534,12 +1572,147 @@ mod tests {
         cell.merge_exploring(snap2);
         let lines = render_lines(&cell.display_lines(80));
 
-        // Should group reads on a single line: "Read file1.rs, file2.rs"
+        // One line per read, the first carrying the "Read" label.
         assert!(
             lines
                 .iter()
+                .any(|l| l.contains("Read") && l.contains("file1.rs")),
+            "Exploring cell should label the first read, got: {lines:?}"
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("file2.rs")),
+            "Exploring cell should list the second read, got: {lines:?}"
+        );
+        assert!(
+            !lines
+                .iter()
                 .any(|l| l.contains("file1.rs") && l.contains("file2.rs")),
-            "Exploring cell should group reads, got: {lines:?}"
+            "Reads should not share one line, got: {lines:?}"
+        );
+    }
+
+    fn make_read_snapshot(path: &str, raw_output: Option<serde_json::Value>) -> ToolSnapshot {
+        ToolSnapshot {
+            call_id: format!("call-{path}"),
+            title: format!("Read {path}"),
+            kind: ToolKind::Read,
+            phase: ToolPhase::Completed,
+            locations: vec![],
+            invocation: Some(Invocation::Read { path: path.into() }),
+            artifacts: vec![],
+            raw_input: None,
+            raw_output,
+            owner_request_id: None,
+        }
+    }
+
+    #[test]
+    fn exploring_cell_shows_read_line_range() {
+        let snapshot = make_read_snapshot(
+            "src/app.rs",
+            Some(serde_json::json!({"lines": {"start": 5, "end": 19, "total": 240}})),
+        );
+        let mut cell = ClientToolCell::new(snapshot, PathBuf::from("/tmp/cwd"), false);
+        cell.mark_exploring();
+        let lines = render_lines(&cell.display_lines(80));
+
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("src/app.rs") && l.contains("lines 5-19 of 240")),
+            "Exploring cell should show the read line range, got: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn exploring_cell_omits_line_range_without_metadata() {
+        let snapshot = make_read_snapshot("src/app.rs", None);
+        let mut cell = ClientToolCell::new(snapshot, PathBuf::from("/tmp/cwd"), false);
+        cell.mark_exploring();
+        let lines = render_lines(&cell.display_lines(80));
+
+        assert!(
+            lines.iter().any(|l| l.contains("src/app.rs")),
+            "Exploring cell should still show the path, got: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|l| l.contains("lines ")),
+            "No metadata means no line range, got: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn exploring_cell_shows_absolute_read_path_relative_to_cwd() {
+        let snapshot = make_read_snapshot("/tmp/cwd/src/app.rs", None);
+        let mut cell = ClientToolCell::new(snapshot, PathBuf::from("/tmp/cwd"), false);
+        cell.mark_exploring();
+        let lines = render_lines(&cell.display_lines(80));
+
+        assert!(
+            lines.iter().any(|l| l.contains("src/app.rs")),
+            "Exploring cell should show the cwd-relative path, got: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|l| l.contains("/tmp/cwd/")),
+            "Cwd prefix should be stripped, got: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn exploring_cell_shows_search_result_count() {
+        let snapshot = ToolSnapshot {
+            call_id: "call-search".into(),
+            title: "duckduckgo_search".into(),
+            kind: ToolKind::Search,
+            phase: ToolPhase::Completed,
+            locations: vec![],
+            invocation: Some(Invocation::Search {
+                query: Some("nori".into()),
+                path: None,
+            }),
+            artifacts: vec![],
+            raw_input: None,
+            raw_output: Some(serde_json::json!({"count": 5})),
+            owner_request_id: None,
+        };
+        let mut cell = ClientToolCell::new(snapshot, PathBuf::from("/tmp/cwd"), false);
+        cell.mark_exploring();
+        let lines = render_lines(&cell.display_lines(80));
+
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("nori") && l.contains("5 results")),
+            "Exploring cell should show the result count, got: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn exploring_cell_uses_singular_result_count() {
+        let snapshot = ToolSnapshot {
+            call_id: "call-search".into(),
+            title: "duckduckgo_search".into(),
+            kind: ToolKind::Search,
+            phase: ToolPhase::Completed,
+            locations: vec![],
+            invocation: Some(Invocation::Search {
+                query: Some("nori".into()),
+                path: None,
+            }),
+            artifacts: vec![],
+            raw_input: None,
+            raw_output: Some(serde_json::json!({"count": 1})),
+            owner_request_id: None,
+        };
+        let mut cell = ClientToolCell::new(snapshot, PathBuf::from("/tmp/cwd"), false);
+        cell.mark_exploring();
+        let lines = render_lines(&cell.display_lines(80));
+
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("nori") && l.contains("1 result") && !l.contains("1 results")),
+            "Exploring cell should singularize one result, got: {lines:?}"
         );
     }
 
