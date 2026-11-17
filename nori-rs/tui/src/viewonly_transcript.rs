@@ -314,12 +314,17 @@ fn format_tool_event(
     artifacts: &[crate::presentation::Artifact],
 ) -> String {
     let mut lines = vec![header];
+    let artifacts = format_artifacts(artifacts);
 
-    if let Some(line) = format_invocation(invocation) {
+    // Match ClientToolCell: adapter-supplied text content wins over the
+    // compact rawInput summary for generic kinds.
+    if artifacts.is_empty()
+        && let Some(line) = format_invocation(invocation)
+    {
         lines.push(line);
     }
 
-    lines.extend(format_artifacts(artifacts));
+    lines.extend(artifacts);
 
     lines.join("\n")
 }

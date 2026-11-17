@@ -365,12 +365,16 @@ impl ClientToolCell {
         lines.push(Line::from(vec![bullet, " ".into(), header.bold()]));
 
         let mut details = Vec::new();
-        if let Some(invocation) = format_invocation(&self.snapshot.invocation)
+        let artifacts = format_artifacts(&self.snapshot.artifacts);
+        // Generic kinds are the adapter's to render: when it supplies text
+        // content, prefer that over the compact rawInput summary.
+        if artifacts.is_empty()
+            && let Some(invocation) = format_invocation(&self.snapshot.invocation)
             && !is_invocation_redundant(&invocation, &self.snapshot.title)
         {
             details.push(relativize_paths_in_text(&invocation, &self.cwd));
         }
-        for artifact in format_artifacts(&self.snapshot.artifacts) {
+        for artifact in artifacts {
             if artifact.contains('\n') {
                 details.extend(artifact.lines().map(str::to_string));
             } else {
