@@ -344,6 +344,45 @@ fn edit_is_one_line_with_counts() {
 }
 
 #[test]
+fn generic_tool_prefers_adapter_content_over_raw_input() {
+    let input = serde_json::json!({
+        "url": "https://docs.rs/ratatui",
+        "prompt": "Style a \"Line\"?",
+    });
+    let with_content = cell(ToolSnapshot {
+        artifacts: vec![Artifact::Text {
+            text: "Line::styled(content, style) applies a style to every span.\nUse .patch_style() to layer on top."
+                .into(),
+        }],
+        ..acp(
+            "f1",
+            ToolKind::Fetch,
+            "Fetch docs.rs",
+            Invocation::Tool {
+                tool_name: "fetch".into(),
+                input: Some(input.clone()),
+            },
+        )
+    });
+    let without_content = cell(acp(
+        "f2",
+        ToolKind::Fetch,
+        "Fetch docs.rs",
+        Invocation::Tool {
+            tool_name: "fetch".into(),
+            input: Some(input),
+        },
+    ));
+    assert_snapshot!(format!(
+        "{}\n\n{}",
+        compact(&with_content),
+        compact(&without_content)
+    ));
+    let rendered = text(&with_content.display_lines(120), 120);
+    assert!(!rendered.contains("Tool: fetch"), "{rendered}");
+}
+
+#[test]
 fn full_view_shows_commands_and_output_with_bold_names() {
     let chained = cell(execute(
         "c",
