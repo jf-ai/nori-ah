@@ -185,10 +185,13 @@ The application event loop matches `SessionEvent::Acp` and
   `owned_prompt_request_id` and keeps a separate private
   `proactive_turn_active` presentation bit. The legacy identifier groups
   unowned presentation or presentation of an agent-owned turn, plus statistics
-  and explicit-idle notifications. It does not set the bottom pane's
-  operational task-running flag, so Ctrl-C cancellation, interrupt hints, and
-  in-task command gating remain tied to locally owned requests. It never drives
-  queue, cancel, loop, ACP phase, or request state.
+  and explicit-idle notifications. It sets the bottom pane's operational
+  task-running flag, so Esc and Ctrl-C cancel it, the interrupt hint shows, and
+  in-task command gating applies as for locally owned requests. Cancelling an
+  agent-owned turn shows `Cancelling` until `idle`
+  (`proactive_turn_cancelling`; a second Ctrl-C ends it locally), while
+  cancelling unowned presentation ends it at once. It never drives queue,
+  loop, ACP phase, or request state.
 - Ordinary metadata does not imply a turn. The Nori Sessions broker's optional
   `_meta.nori.status` extension establishes an agent-owned turn only when no
   locally owned prompt or load is active: exact `working` starts or confirms

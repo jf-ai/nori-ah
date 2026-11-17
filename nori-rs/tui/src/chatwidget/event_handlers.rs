@@ -149,7 +149,10 @@ impl ChatWidget {
                 return;
             }
             match status {
-                crate::presentation::NoriTurnStatus::Working => self.start_proactive_turn(),
+                crate::presentation::NoriTurnStatus::Working => {
+                    self.start_proactive_turn();
+                    self.proactive_turn_status_driven = true;
+                }
                 crate::presentation::NoriTurnStatus::Idle => self.complete_proactive_turn(),
             }
             return;
@@ -176,6 +179,8 @@ impl ChatWidget {
     fn start_proactive_turn(&mut self) {
         if !self.proactive_turn_active {
             self.proactive_turn_active = true;
+            self.proactive_turn_status_driven = false;
+            self.proactive_turn_cancelling = false;
             self.start_task_presentation(true);
         }
     }
@@ -183,6 +188,8 @@ impl ChatWidget {
     fn separate_proactive_turn(&mut self) {
         self.record_proactive_assistant_message();
         self.proactive_turn_active = false;
+        self.proactive_turn_status_driven = false;
+        self.proactive_turn_cancelling = false;
         self.flush_answer_stream_with_separator();
     }
 
@@ -190,6 +197,8 @@ impl ChatWidget {
         if self.proactive_turn_active {
             self.record_proactive_assistant_message();
             self.proactive_turn_active = false;
+            self.proactive_turn_status_driven = false;
+            self.proactive_turn_cancelling = false;
             self.finish_task_presentation(None, true);
         }
     }
@@ -788,6 +797,13 @@ impl ChatWidget {
             return;
         }
 
+        // A second Ctrl+C while a cancelled agent-owned turn waits for the
+        // agent's `idle` stops waiting and ends the turn locally.
+        if self.proactive_turn_cancelling {
+            self.complete_proactive_turn();
+            return;
+        }
+
         if self.bottom_pane.is_task_running() {
             self.bottom_pane.show_ctrl_c_quit_hint();
             self.on_cancel_action();
@@ -799,12 +815,26 @@ impl ChatWidget {
 
     /// Handle a user-initiated cancel (Ctrl-C or Esc).
     ///
-    /// Ends a proactive turn in the UI immediately, then submits the harness
-    /// cancel. For proactive turns the harness phase is Idle; the reducer still
-    /// emits SendCancel there, so session/cancel reaches the agent either way.
+    /// An agent-owned turn (`_meta.nori.status=working`) shows "Cancelling"
+    /// until the agent reports `idle`, like a client-owned turn waits for its
+    /// prompt response; repeat cancels are ignored meanwhile. Unowned
+    /// presentation has no `idle` to wait for, so it ends immediately. Either
+    /// way the harness cancel follows: outside a local prompt the harness phase
+    /// is Idle, and the reducer still emits SendCancel there, so session/cancel
+    /// reaches the agent.
     pub(crate) fn on_cancel_action(&mut self) {
         if self.proactive_turn_active {
-            self.complete_proactive_turn();
+            if self.proactive_turn_cancelling {
+                return;
+            }
+            if self.proactive_turn_status_driven {
+                self.proactive_turn_cancelling = true;
+                self.bottom_pane.set_interrupt_hint_visible(false);
+                self.set_status_header("Cancelling".to_string());
+                self.request_redraw();
+            } else {
+                self.complete_proactive_turn();
+            }
         }
         self.submit_harness_action(crate::app_event::HarnessAction::Cancel);
     }
