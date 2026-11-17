@@ -37,7 +37,8 @@ persists to this same key, so startup configuration and runtime changes share
 one source of truth.
 
 `[tui] tool_output` resolves to `NoriConfig::tool_output` (`ToolOutput::Compact`
-by default, or `Full`). The TUI's tool call cells read it to choose the inline
+by default, `Full`, or `Lines(n)` for `tool_output = <n>`; zero and negative
+numbers fail to load). The TUI's tool call cells read it to choose the inline
 history view; the transcript overlay always shows the full view. The TUI's
 directory-trust onboarding step can write this key with `NoriConfigEdits`.
 

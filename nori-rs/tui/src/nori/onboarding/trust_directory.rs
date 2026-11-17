@@ -107,10 +107,10 @@ impl KeyboardHandler for NoriTrustDirectoryWidget {
         if let Some(menu) = &mut self.tool_output_menu {
             match menu.handle(action) {
                 MenuOutcome::Activated(tool_output) => {
-                    let value = if tool_output == ToolOutput::Full {
-                        "full"
-                    } else {
-                        "compact"
+                    // The menu only offers Compact and Full.
+                    let value = match tool_output {
+                        ToolOutput::Full => "full",
+                        ToolOutput::Compact | ToolOutput::Lines(_) => "compact",
                     };
                     if let Err(e) = NoriConfigEdits::new(&self.nori_home)
                         .set_path(&["tui", "tool_output"], value)

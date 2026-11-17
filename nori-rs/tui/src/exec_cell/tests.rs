@@ -380,6 +380,76 @@ fn full_setting_renders_full_view_inline() {
     );
 }
 
+fn numbered_output(count: i32) -> String {
+    (1..=count)
+        .map(|n| format!("line {n}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn budget_view(snapshot: ToolSnapshot, lines: i32) -> String {
+    let cell = cell(snapshot).with_tool_output(ToolOutput::Lines(lines));
+    format!(
+        "--- 120 ---\n{}\n--- 40 ---\n{}",
+        text(&cell.display_lines(120), 120),
+        text(&cell.display_lines(40), 40)
+    )
+}
+
+#[test]
+fn line_budget_shows_short_output_in_full() {
+    let output = numbered_output(4);
+    assert_snapshot!(budget_view(
+        execute("b", ToolPhase::Completed, "cargo build", Some((&output, 0))),
+        15
+    ));
+}
+
+#[test]
+fn line_budget_truncates_long_output_around_a_marker() {
+    let output = numbered_output(40);
+    assert_snapshot!(budget_view(
+        execute("b", ToolPhase::Completed, "cargo build", Some((&output, 0))),
+        15
+    ));
+}
+
+#[test]
+fn line_budget_wraps_long_lines_and_counts_source_lines() {
+    let long = format!("{} end", "word ".repeat(20));
+    let output = format!("{long}\n2\n3\n4\n{long}");
+    assert_snapshot!(budget_view(
+        execute("b", ToolPhase::Completed, "cargo build", Some((&output, 0))),
+        3
+    ));
+}
+
+#[test]
+fn line_budget_marks_failed_output_in_red() {
+    let output = numbered_output(30);
+    let cell = cell(execute(
+        "b",
+        ToolPhase::Failed,
+        "cargo test",
+        Some((&output, 101)),
+    ))
+    .with_tool_output(ToolOutput::Lines(10));
+    let lines = cell.display_lines(120);
+    assert_snapshot!(text(&lines, 120));
+    assert_eq!(span_style(&lines, "line 1").style.fg, Some(Color::Red));
+    assert_eq!(span_style(&lines, "line 30").style.fg, Some(Color::Red));
+}
+
+#[test]
+fn line_budget_leaves_other_tool_cells_compact() {
+    let group = explore_group();
+    let budget_group = explore_group().with_tool_output(ToolOutput::Lines(15));
+    assert_eq!(
+        text(&budget_group.display_lines(120), 120),
+        text(&group.display_lines(120), 120)
+    );
+}
+
 #[test]
 fn completed_command_without_output_is_one_line() {
     let cell = cell(execute(
