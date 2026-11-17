@@ -1,0 +1,10 @@
+---
+source: tui/src/exec_cell/tests.rs
+expression: compact(&no_total)
+---
+--- 120 ---
+• Explored 1 read
+  └ Read foo.rs · lines 5-19
+--- 80 ---
+• Explored 1 read
+  └ Read foo.rs · lines 5-19

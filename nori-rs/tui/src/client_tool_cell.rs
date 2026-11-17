@@ -264,7 +264,23 @@ impl ClientToolCell {
                 compact_command(command, max_width)
             }
             (ToolKind::Read, Some(Invocation::Read { path })) => {
-                vec!["Read".cyan(), " ".into(), read_display_name(path).into()]
+                let mut spans = vec!["Read".cyan(), " ".into(), read_display_name(path).into()];
+                // Optional adapter convention: `rawOutput.lines = {start, end, total?}`.
+                let lines = step.raw_output.as_ref().and_then(|out| out.get("lines"));
+                let bound = |key| {
+                    lines
+                        .and_then(|l| l.get(key))
+                        .and_then(serde_json::Value::as_i64)
+                        .filter(|n| *n >= 0)
+                };
+                if let (Some(start), Some(end)) = (bound("start"), bound("end")) {
+                    spans.push(" · ".dim());
+                    spans.push(match bound("total") {
+                        Some(total) => format!("lines {start}-{end} of {total}").dim(),
+                        None => format!("lines {start}-{end}").dim(),
+                    });
+                }
+                spans
             }
             (_, Some(Invocation::Search { query, path: dir })) => {
                 let mut spans = vec!["Search".cyan(), " ".into()];
@@ -272,6 +288,18 @@ impl ClientToolCell {
                 if let Some(dir) = dir {
                     spans.push(" in ".dim());
                     spans.push(path(dir).into());
+                }
+                // Optional adapter convention: `rawOutput.count` is the hit count.
+                let count = step.raw_output.as_ref().and_then(|out| out.get("count"));
+                if let Some(count) = count
+                    .and_then(serde_json::Value::as_i64)
+                    .filter(|n| *n >= 0)
+                {
+                    spans.push(" · ".dim());
+                    spans.push(match count {
+                        1 => "1 result".dim(),
+                        n => format!("{n} results").dim(),
+                    });
                 }
                 spans
             }

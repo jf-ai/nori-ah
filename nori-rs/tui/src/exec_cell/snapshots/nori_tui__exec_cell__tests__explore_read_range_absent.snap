@@ -1,0 +1,10 @@
+---
+source: tui/src/exec_cell/tests.rs
+expression: compact(&absent)
+---
+--- 120 ---
+• Explored 1 read
+  └ Read foo.rs
+--- 80 ---
+• Explored 1 read
+  └ Read foo.rs
