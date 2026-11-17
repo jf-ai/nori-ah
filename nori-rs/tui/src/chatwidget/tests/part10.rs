@@ -1204,7 +1204,9 @@ fn proactive_turn_enables_cancel_controls() {
     // HarnessAction::Cancel event rather than the no-harness fallback.
     let events: Vec<AppEvent> = std::iter::from_fn(|| cancel_rx.try_recv().ok()).collect();
     assert!(
-        events.iter().any(|e| matches!(e, AppEvent::HarnessActionFailed(_))),
+        events
+            .iter()
+            .any(|e| matches!(e, AppEvent::HarnessActionFailed(_))),
         "expected cancel path (HarnessActionFailed) during proactive turn: {events:#?}"
     );
     assert!(
