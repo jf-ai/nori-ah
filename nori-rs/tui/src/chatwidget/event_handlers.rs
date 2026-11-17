@@ -799,11 +799,9 @@ impl ChatWidget {
 
     /// Handle a user-initiated cancel (Ctrl-C or Esc).
     ///
-    /// For observer/proactive turns the harness phase is Idle, so a plain
-    /// HarnessAction::Cancel would be silently swallowed by the session reducer
-    /// before reaching ACP. Complete the UI turn directly first, then fire the
-    /// harness cancel anyway — it's a no-op for idle phases but correctly
-    /// cancels any real prompt that happens to be in flight.
+    /// Ends a proactive turn in the UI immediately, then submits the harness
+    /// cancel. For proactive turns the harness phase is Idle; the reducer still
+    /// emits SendCancel there, so session/cancel reaches the agent either way.
     pub(crate) fn on_cancel_action(&mut self) {
         if self.proactive_turn_active {
             self.complete_proactive_turn();
