@@ -193,6 +193,11 @@ pub(crate) struct ChatWidget {
     session_generation: crate::app_event::SessionGeneration,
     owned_prompt_request_id: Option<nori_protocol::acp::v1::RequestId>,
     proactive_turn_active: bool,
+    // The presentation is an agent-owned turn (`_meta.nori.status=working`),
+    // so the agent will end it with `idle`.
+    proactive_turn_status_driven: bool,
+    // A cancel was sent for the agent-owned turn; waiting for `idle`.
+    proactive_turn_cancelling: bool,
     unpaired_prompt_error_ids: HashSet<nori_protocol::acp::v1::RequestId>,
     completed_client_tool_calls: HashSet<String>,
     client_event_normalizer: crate::presentation::ClientEventNormalizer,

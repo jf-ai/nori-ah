@@ -1,6 +1,6 @@
 use super::*;
 
-fn render_bottom_pane(chat: &mut ChatWidget, width: u16) -> String {
+pub(super) fn render_bottom_pane(chat: &mut ChatWidget, width: u16) -> String {
     use crate::render::renderable::Renderable;
     use ratatui::buffer::Buffer;
     use ratatui::layout::Rect;
@@ -1053,7 +1053,7 @@ fn replayed_session_info_updates_identify_the_replay_source() {
     assert!(!live.contains("(transcript replay)"), "{live}");
 }
 
-fn replay_text_chunk(
+pub(super) fn replay_text_chunk(
     stream: crate::presentation::MessageStream,
     message_id: &str,
     text: &str,
@@ -1076,7 +1076,7 @@ fn replay_text_chunk(
     replay_message_update(update)
 }
 
-fn nori_status_update(status: &str) -> nori_protocol::SessionEvent {
+pub(super) fn nori_status_update(status: &str) -> nori_protocol::SessionEvent {
     let mut meta = serde_json::Map::new();
     meta.insert("nori".to_string(), serde_json::json!({ "status": status }));
     replay_message_update(nori_protocol::acp::v1::SessionUpdate::SessionInfoUpdate(

@@ -314,8 +314,15 @@ notifications with `_meta.nori.status`:
 
 The TUI hides a known status-only frame. If the same frame also carries
 `title` or `updated_at`, those fields remain visible. Unknown status values are
-ordinary session metadata. Agent ownership implies no queue, cancellation,
-loop, permission, or request semantics.
+ordinary session metadata. Agent ownership implies no queue, loop,
+permission, or request semantics.
+
+An agent-owned turn is cancellable. Esc or Ctrl-C sends `session/cancel` (see
+[Cancelling a prompt](#cancelling-a-prompt)) and the turn shows `Cancelling`
+until the agent's `idle` ends it, the same way a client-owned turn waits for
+its prompt response. Repeat cancels are ignored while waiting; a second Ctrl-C
+stops waiting and ends the presentation locally. Unowned presentation has no
+`idle` to wait for, so a cancel ends it immediately.
 
 ### 4. Attributed tool updates
 
@@ -390,6 +397,12 @@ If `phase == Prompt { cancelling: false, .. }`:
 - keep `active` intact
 
 If already cancelling, do nothing.
+
+If `phase` is not `Prompt` (an agent-owned turn or unowned presentation), send
+`session/cancel` without the bookkeeping above: there is no active request to
+own tool snapshots or permission requests. The cancel watchdog for such a
+cancel only warns that the agent is slow; it never force-cancels, because no
+local prompt task exists to abort.
 
 `session/cancel` does not transition the session to `Idle`. The prompt remains
 active until the response to the original `session/prompt` arrives.

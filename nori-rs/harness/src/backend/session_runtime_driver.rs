@@ -869,19 +869,30 @@ impl AcpBackend {
                 let event_tx = self.backend_event_tx.clone();
                 let prompt_task_abort = Arc::clone(&self.prompt_task_abort);
                 let prompt_result_tx = self.prompt_result_tx.clone();
+                // Only a cancel sent while a local session/prompt is in flight
+                // has a prompt task to force-cancel, so decide that now. A
+                // background (observer) turn has none, and a prompt started
+                // after this cancel must never be aborted by this watchdog.
+                let guards_prompt = prompt_task_abort.lock().await.is_some();
                 let watchdog = tokio::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(CANCEL_WARNING_SECS)).await;
                     warn!("Agent has not responded to cancel after {CANCEL_WARNING_SECS}s");
+                    let message = if guards_prompt {
+                        format!(
+                            "Agent is slow to cancel. Will force-cancel in {}s…",
+                            CANCEL_FORCE_SECS - CANCEL_WARNING_SECS
+                        )
+                    } else {
+                        "Agent is slow to cancel.".to_string()
+                    };
                     let _ = event_tx
                         .send(BackendEvent::Public(SessionEvent::Nori(
-                            nori_protocol::NoriEvent::Notice(nori_protocol::Notice {
-                                message: format!(
-                                    "Agent is slow to cancel. Will force-cancel in {}s…",
-                                    CANCEL_FORCE_SECS - CANCEL_WARNING_SECS
-                                ),
-                            }),
+                            nori_protocol::NoriEvent::Notice(nori_protocol::Notice { message }),
                         )))
                         .await;
+                    if !guards_prompt {
+                        return;
+                    }
 
                     tokio::time::sleep(std::time::Duration::from_secs(
                         CANCEL_FORCE_SECS - CANCEL_WARNING_SECS,
@@ -895,7 +906,16 @@ impl AcpBackend {
                             .await;
                     }
                 });
-                *self.cancel_timeout_abort.lock().await = Some(watchdog.abort_handle());
+                // A repeat cancel replaces the watchdog; stop the old one so it
+                // cannot fire after its turn has ended.
+                if let Some(previous) = self
+                    .cancel_timeout_abort
+                    .lock()
+                    .await
+                    .replace(watchdog.abort_handle())
+                {
+                    previous.abort();
+                }
             }
             SideEffect::ObserverTurnEnded => {
                 if let Some(abort) = self.cancel_timeout_abort.lock().await.take() {

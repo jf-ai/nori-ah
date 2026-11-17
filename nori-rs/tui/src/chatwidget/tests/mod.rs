@@ -155,6 +155,7 @@ mod context;
 mod delegation;
 mod part10;
 mod part8;
+mod proactive_cancel;
 
 pub(crate) fn make_scoped_chatwidget_manual() -> (
     ChatWidget,
