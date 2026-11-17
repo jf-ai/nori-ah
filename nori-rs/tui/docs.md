@@ -549,7 +549,11 @@ status indicator (green, red, or a spinner), `Ran`/`Running` plus a command
 summary with bold command names and arguments elided to `…`, and one `└` line
 holding the last non-blank output line. Read-only Execute calls join `Read`,
 `Search`, and list-files calls in one `Explored` group with read/search/failed
-counts; edits show only their header. The full view shows the highlighted
+counts; edits show only their header. An adapter may add optional `rawOutput`
+fields that explored steps display as a dim suffix: a Read with
+`lines: {start, end, total?}` shows `lines 5-19 of 240` (or `lines 5-19`), and a
+Search with a non-negative integer `count` shows `12 results` (`1 result`).
+Missing or malformed fields are ignored. The full view shows the highlighted
 command, all output, every exploring step, and diffs. Snapshot routing, the
 pending/completed bookkeeping, and exploring-group lifetime are described in
 [EXEC_CELL_LIFECYCLE.md](src/chatwidget/EXEC_CELL_LIFECYCLE.md).

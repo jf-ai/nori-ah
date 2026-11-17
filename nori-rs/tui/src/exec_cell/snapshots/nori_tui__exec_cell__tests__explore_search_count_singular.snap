@@ -1,0 +1,10 @@
+---
+source: tui/src/exec_cell/tests.rs
+expression: compact(&one)
+---
+--- 120 ---
+• Explored 1 search
+  └ Search needle in src · 1 result
+--- 80 ---
+• Explored 1 search
+  └ Search needle in src · 1 result

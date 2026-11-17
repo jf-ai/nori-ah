@@ -270,6 +270,115 @@ fn explore_group_summarizes_and_counts_failures() {
     );
 }
 
+fn explore_cell_with_output(
+    kind: ToolKind,
+    title: &str,
+    invocation: Invocation,
+    raw_output: Option<serde_json::Value>,
+) -> ClientToolCell {
+    let mut snapshot = acp("explore-1", kind, title, invocation);
+    snapshot.raw_output = raw_output;
+    let mut cell = cell(snapshot);
+    cell.mark_exploring();
+    cell
+}
+
+fn read_invocation() -> Invocation {
+    Invocation::Read {
+        path: cwd().join("src/foo.rs"),
+    }
+}
+
+fn search_invocation() -> Invocation {
+    Invocation::Search {
+        query: Some("needle".into()),
+        path: Some(cwd().join("src")),
+    }
+}
+
+#[test]
+fn explore_read_shows_line_range_from_raw_output() {
+    let ranged = explore_cell_with_output(
+        ToolKind::Read,
+        "Read src/foo.rs",
+        read_invocation(),
+        Some(serde_json::json!({"lines": {"start": 5, "end": 19, "total": 240}})),
+    );
+    let no_total = explore_cell_with_output(
+        ToolKind::Read,
+        "Read src/foo.rs",
+        read_invocation(),
+        Some(serde_json::json!({"lines": {"start": 5, "end": 19}})),
+    );
+    let absent =
+        explore_cell_with_output(ToolKind::Read, "Read src/foo.rs", read_invocation(), None);
+    assert_snapshot!("explore_read_range_compact", compact(&ranged));
+    assert_snapshot!("explore_read_range_full", full(&ranged));
+    assert_snapshot!("explore_read_range_without_total", compact(&no_total));
+    assert_snapshot!("explore_read_range_absent", compact(&absent));
+
+    let lines = ranged.display_lines(120);
+    let suffix = span_style(&lines, "lines 5-19 of 240");
+    assert!(suffix.style.add_modifier.contains(Modifier::DIM));
+}
+
+#[test]
+fn explore_read_ignores_malformed_line_range() {
+    let absent = text(
+        &explore_cell_with_output(ToolKind::Read, "Read src/foo.rs", read_invocation(), None)
+            .display_lines(120),
+        120,
+    );
+    for raw in [
+        serde_json::json!({"lines": {"start": 5}}),
+        serde_json::json!({"lines": {"start": "5", "end": 19}}),
+        serde_json::json!({"lines": {"start": -1, "end": 19}}),
+        serde_json::json!({"lines": 7}),
+        serde_json::json!("lines 5-19"),
+    ] {
+        let cell = explore_cell_with_output(
+            ToolKind::Read,
+            "Read src/foo.rs",
+            read_invocation(),
+            Some(raw),
+        );
+        assert_eq!(text(&cell.display_lines(120), 120), absent);
+    }
+}
+
+#[test]
+fn explore_search_shows_result_count_from_raw_output() {
+    let many = explore_cell_with_output(
+        ToolKind::Search,
+        "Search needle",
+        search_invocation(),
+        Some(serde_json::json!({"count": 12})),
+    );
+    let one = explore_cell_with_output(
+        ToolKind::Search,
+        "Search needle",
+        search_invocation(),
+        Some(serde_json::json!({"count": 1})),
+    );
+    let zero = explore_cell_with_output(
+        ToolKind::Search,
+        "Search needle",
+        search_invocation(),
+        Some(serde_json::json!({"count": 0})),
+    );
+    let absent =
+        explore_cell_with_output(ToolKind::Search, "Search needle", search_invocation(), None);
+    assert_snapshot!("explore_search_count_compact", compact(&many));
+    assert_snapshot!("explore_search_count_full", full(&many));
+    assert_snapshot!("explore_search_count_singular", compact(&one));
+    assert_snapshot!("explore_search_count_zero", compact(&zero));
+    assert_snapshot!("explore_search_count_absent", compact(&absent));
+
+    let lines = many.display_lines(120);
+    let suffix = span_style(&lines, "12 results");
+    assert!(suffix.style.add_modifier.contains(Modifier::DIM));
+}
+
 #[test]
 fn read_only_commands_explore_and_writes_run() {
     let header = |command: &str| {
