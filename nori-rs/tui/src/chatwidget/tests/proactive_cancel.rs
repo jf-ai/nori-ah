@@ -34,7 +34,13 @@ fn agent_owned_turn_cancel_waits_for_idle() {
     chat.on_ctrl_c();
 
     assert!(chat.bottom_pane.is_task_running());
-    insta::assert_snapshot!(render_bottom_pane(&mut chat, 80));
+    // The composer placeholder is chosen at random, so leave its line out.
+    let rendered = render_bottom_pane(&mut chat, 80)
+        .lines()
+        .filter(|line| !line.starts_with('›'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    insta::assert_snapshot!(rendered);
 
     // Output the agent streams before it stops stays in the same turn.
     chat.handle_session_event(generation, answer_chunk("a2", "Stopping."));
