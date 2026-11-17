@@ -270,7 +270,8 @@ impl ClientToolCell {
                 let bound = |key| {
                     lines
                         .and_then(|l| l.get(key))
-                        .and_then(serde_json::Value::as_u64)
+                        .and_then(serde_json::Value::as_i64)
+                        .filter(|n| *n >= 0)
                 };
                 if let (Some(start), Some(end)) = (bound("start"), bound("end")) {
                     spans.push(" · ".dim());
@@ -290,7 +291,10 @@ impl ClientToolCell {
                 }
                 // Optional adapter convention: `rawOutput.count` is the hit count.
                 let count = step.raw_output.as_ref().and_then(|out| out.get("count"));
-                if let Some(count) = count.and_then(serde_json::Value::as_u64) {
+                if let Some(count) = count
+                    .and_then(serde_json::Value::as_i64)
+                    .filter(|n| *n >= 0)
+                {
                     spans.push(" · ".dim());
                     spans.push(match count {
                         1 => "1 result".dim(),
