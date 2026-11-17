@@ -1179,34 +1179,52 @@ async fn local_submission_waits_for_the_harness_prompt_broadcast() {
 }
 
 #[test]
-fn proactive_turn_does_not_enable_owned_request_controls() {
+fn proactive_turn_enables_cancel_controls() {
+    // Proactive turns (triggered by `_meta.nori.status=working`) are marked cancellable
+    // so that Esc and Ctrl-C can interrupt background agent runs the user didn't initiate.
     let (mut cancel_chat, mut cancel_rx, _op_rx) = make_chatwidget_manual();
     let cancel_generation = cancel_chat.session_generation;
 
     cancel_chat.handle_session_event(cancel_generation, nori_status_update("working"));
     cancel_chat.on_ctrl_c();
 
-    let cancel_actions = std::iter::from_fn(|| cancel_rx.try_recv().ok())
-        .filter_map(|event| match event {
-            AppEvent::HarnessAction(action) => Some(action),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
+    // In tests there is no live harness, so submit_harness_action(Cancel) falls back to
+    // HarnessActionFailed rather than HarnessAction::Cancel. We verify the cancel code
+    // path was taken (not begin_exit) by asserting HarnessActionFailed is present and
+    // ExitRequest is absent.
+    //
+    // NOTE: The original test (proactive_turn_does_not_enable_owned_request_controls)
+    // asserted absence of HarnessAction::Cancel, which is vacuously true — that event
+    // can never appear in the test harness regardless of which code path is taken.
+    // Confirmed empirically: reverting just the test file while keeping our implementation
+    // change in place still passed, proving the original assertion caught nothing.
+    // ExitRequest (from begin_exit) is the meaningful negative signal here.
+    //
+    // TODO (pre-PR): Wire up a mock harness so we can assert on the actual
+    // HarnessAction::Cancel event rather than the no-harness fallback.
+    let events: Vec<AppEvent> = std::iter::from_fn(|| cancel_rx.try_recv().ok()).collect();
     assert!(
-        !cancel_actions
+        events
             .iter()
-            .any(|action| matches!(action, crate::app_event::HarnessAction::Cancel)),
-        "{cancel_actions:#?}"
+            .any(|e| matches!(e, AppEvent::HarnessActionFailed(_))),
+        "expected cancel path (HarnessActionFailed) during proactive turn: {events:#?}"
+    );
+    assert!(
+        !events.iter().any(|e| matches!(e, AppEvent::ExitRequest)),
+        "expected no ExitRequest (begin_exit should not fire during proactive turn): {events:#?}"
     );
 
+    // Session-management commands remain blocked during proactive turns since
+    // is_task_running is now set, matching owned-turn command gating.
     let (mut command_chat, mut command_rx, _op_rx) = make_chatwidget_manual();
     let command_generation = command_chat.session_generation;
     command_chat.handle_session_event(command_generation, nori_status_update("working"));
     command_chat.dispatch_command(SlashCommand::New);
 
     assert!(
-        std::iter::from_fn(|| command_rx.try_recv().ok())
-            .any(|event| matches!(event, AppEvent::NewSession))
+        !std::iter::from_fn(|| command_rx.try_recv().ok())
+            .any(|event| matches!(event, AppEvent::NewSession)),
+        "expected NewSession to be blocked during cancellable proactive turn"
     );
 }
 

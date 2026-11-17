@@ -91,6 +91,10 @@ pub enum SideEffect {
     ResolvePermissionCancelled { request_id: String },
     /// Reject a prompt instead of adding it to the queue.
     RejectPromptBusy { event_id: String },
+    /// An observer (background) turn ended via `status=idle`.
+    /// The runtime driver uses this to abort the cancel watchdog if one is pending,
+    /// since observer turns have no `session/prompt` response to signal completion.
+    ObserverTurnEnded,
 }
 
 /// The output of a single reduction step.
@@ -257,58 +261,65 @@ fn reduce_cancel_submit(
     expected_request_id: Option<&acp::RequestId>,
     out: &mut ReduceOutput,
 ) {
-    if let SessionPhase::Prompt {
+    // If not in a locally-initiated prompt (e.g. observer/proactive turn where
+    // the agent was triggered externally), still send the cancel — the agent may
+    // be running a real prompt that AH can interrupt. Skip state management since
+    // we have no request_id to track.
+    let SessionPhase::Prompt {
         cancelling,
         request_id,
         ..
     } = &mut runtime.phase
-    {
-        if expected_request_id.is_some_and(|expected| expected != request_id) {
-            return;
-        }
-        if *cancelling {
-            return; // double cancel is a no-op
-        }
-        *cancelling = true;
-        let owner_id = request_id.to_string();
-
-        // Mark non-finished tool snapshots for this request as failed.
-        for snapshot in runtime.persisted.tool_calls.values_mut() {
-            if snapshot.owner_request_id.as_deref() == Some(owner_id.as_str())
-                && !is_terminal_phase(&snapshot.phase)
-            {
-                snapshot.phase = crate::normalized::ToolPhase::Failed;
-            }
-        }
-
-        // Resolve pending permission requests as cancelled.
-        if let Some(active) = &runtime.active {
-            for perm_id in &active.pending_permission_requests {
-                out.side_effects
-                    .push(SideEffect::ResolvePermissionCancelled {
-                        request_id: perm_id.clone(),
-                    });
-            }
-        }
-
-        debug!(
-            target: "acp_event_flow",
-            request_id = %owner_id,
-            pending_permission_requests = runtime
-                .active
-                .as_ref()
-                .map_or(0, |active| active.pending_permission_requests.len()),
-            tool_calls = runtime
-                .active
-                .as_ref()
-                .map_or(0, |active| active.tool_call_ids.len()),
-            "Reducer marked the active prompt as cancelling"
-        );
-
-        out.events
-            .push(ClientEvent::SessionPhaseChanged(runtime.phase_view()));
+    else {
         out.side_effects.push(SideEffect::SendCancel);
+        return;
+    };
+
+    if expected_request_id.is_some_and(|expected| expected != request_id) {
+        return;
     }
+    if *cancelling {
+        return; // double cancel is a no-op
+    }
+    *cancelling = true;
+    let owner_id = request_id.to_string();
+
+    // Mark non-finished tool snapshots for this request as failed.
+    for snapshot in runtime.persisted.tool_calls.values_mut() {
+        if snapshot.owner_request_id.as_deref() == Some(owner_id.as_str())
+            && !is_terminal_phase(&snapshot.phase)
+        {
+            snapshot.phase = crate::normalized::ToolPhase::Failed;
+        }
+    }
+
+    // Resolve pending permission requests as cancelled.
+    if let Some(active) = &runtime.active {
+        for perm_id in &active.pending_permission_requests {
+            out.side_effects
+                .push(SideEffect::ResolvePermissionCancelled {
+                    request_id: perm_id.clone(),
+                });
+        }
+    }
+
+    debug!(
+        target: "acp_event_flow",
+        request_id = %owner_id,
+        pending_permission_requests = runtime
+            .active
+            .as_ref()
+            .map_or(0, |active| active.pending_permission_requests.len()),
+        tool_calls = runtime
+            .active
+            .as_ref()
+            .map_or(0, |active| active.tool_call_ids.len()),
+        "Reducer marked the active prompt as cancelling"
+    );
+
+    out.events
+        .push(ClientEvent::SessionPhaseChanged(runtime.phase_view()));
+    out.side_effects.push(SideEffect::SendCancel);
 }
 
 // ---------------------------------------------------------------------------
@@ -584,6 +595,9 @@ fn reduce_metadata_update(
                 match status {
                     "working" => runtime.observer_turn_active = true,
                     "idle" => {
+                        if runtime.observer_turn_active {
+                            out.side_effects.push(SideEffect::ObserverTurnEnded);
+                        }
                         runtime.observer_turn_active = false;
                         runtime.orphan_update_warning_emitted = false;
                     }

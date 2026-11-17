@@ -176,7 +176,7 @@ impl ChatWidget {
     fn start_proactive_turn(&mut self) {
         if !self.proactive_turn_active {
             self.proactive_turn_active = true;
-            self.start_task_presentation(false);
+            self.start_task_presentation(true);
         }
     }
 
@@ -510,7 +510,8 @@ impl ChatWidget {
 
     fn start_task_presentation(&mut self, owned: bool) {
         self.bottom_pane.clear_ctrl_c_quit_hint();
-        // Owned requests enable task controls; proactive work gets display-only status.
+        // Owned requests enable task controls; proactive turns also pass owned=true
+        // so that Esc and Ctrl-C can cancel background agent runs.
         if owned {
             self.bottom_pane.set_task_running(true);
         } else {
@@ -789,11 +790,25 @@ impl ChatWidget {
 
         if self.bottom_pane.is_task_running() {
             self.bottom_pane.show_ctrl_c_quit_hint();
-            self.submit_harness_action(crate::app_event::HarnessAction::Cancel);
+            self.on_cancel_action();
             return;
         }
 
         self.begin_exit();
+    }
+
+    /// Handle a user-initiated cancel (Ctrl-C or Esc).
+    ///
+    /// For observer/proactive turns the harness phase is Idle, so a plain
+    /// HarnessAction::Cancel would be silently swallowed by the session reducer
+    /// before reaching ACP. Complete the UI turn directly first, then fire the
+    /// harness cancel anyway — it's a no-op for idle phases but correctly
+    /// cancels any real prompt that happens to be in flight.
+    pub(crate) fn on_cancel_action(&mut self) {
+        if self.proactive_turn_active {
+            self.complete_proactive_turn();
+        }
+        self.submit_harness_action(crate::app_event::HarnessAction::Cancel);
     }
 
     pub(crate) fn on_custom_prompts_loaded(
