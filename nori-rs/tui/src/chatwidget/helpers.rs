@@ -543,15 +543,6 @@ impl ChatWidget {
 
     // --- Terminal title management ---
 
-    /// Returns the project name derived from the working directory.
-    fn project_name(&self) -> String {
-        self.config
-            .cwd
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_default()
-    }
-
     /// Whether the terminal title spinner should animate right now.
     pub(crate) fn should_animate_terminal_title_spinner(&self) -> bool {
         self.config.animations && self.terminal_title_has_active_progress()
@@ -578,12 +569,12 @@ impl ChatWidget {
             None
         };
 
-        let project = self.project_name();
-        if project.is_empty() {
+        let agent = self.config.active_agent.clone();
+        if agent.is_empty() {
             return;
         }
 
-        let title = crate::terminal_title::compose_title(&project, spinner_frame);
+        let title = crate::terminal_title::compose_title(&agent, spinner_frame);
 
         // Skip redundant writes.
         if self.last_terminal_title.as_deref() == Some(&title) {
