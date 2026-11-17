@@ -951,8 +951,8 @@ impl App {
                 return Ok(false);
             }
             AppEvent::HarnessAction(action) => {
-                // Cancel gets special treatment: on_cancel_action handles
-                // proactive/observer turns that the harness can't cancel itself.
+                // Cancel goes through on_cancel_action so a proactive turn also
+                // ends in the UI immediately.
                 if matches!(action, crate::app_event::HarnessAction::Cancel) {
                     self.chat_widget.on_cancel_action();
                 } else {
