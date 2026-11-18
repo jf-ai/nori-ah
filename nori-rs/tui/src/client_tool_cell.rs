@@ -473,10 +473,15 @@ fn step_bullet(step: &ToolSnapshot) -> Span<'static> {
     }
 }
 
-/// Splits `len` lines for `[tui] tool_output_lines`: how many to show from the
-/// start, how many to hide behind a `… +K lines` marker, and how many to show
-/// from the end. The marker takes one of the cap's lines; the tail gets the
-/// odd one out. Without a cap, or when everything fits, nothing is hidden.
+/// Splits `len` lines for `[tui] tool_output_lines`.
+///
+/// Returns `(head, hidden, tail)`, which always sum to `len`:
+/// - `head`: lines to show from the start,
+/// - `hidden`: lines to replace with one `… +{hidden} lines` marker,
+/// - `tail`: lines to show from the end.
+///
+/// The marker takes one of the cap's lines; the tail gets the odd one out.
+/// Without a cap, or when everything fits, this is `(len, 0, 0)`.
 fn output_window(len: usize, output_line_cap: Option<i32>) -> (usize, usize, usize) {
     match output_line_cap.and_then(|cap| usize::try_from(cap).ok()) {
         Some(cap) if len > cap => {
