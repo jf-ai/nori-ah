@@ -2096,68 +2096,14 @@ impl Default for TuiConfig {
 }
 
 /// How tool calls render inline.
-///
-/// In TOML this is `"compact"`, `"full"`, or a positive integer line budget
-/// (`tool_output = 15`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ToolOutput {
     /// One line per tool call: status dot, command summary, last output line.
     #[default]
     Compact,
     /// Every command in full with its output.
     Full,
-    /// Like compact, except a command's output shows at most this many source
-    /// lines: the first and last lines around a `… +K lines` marker.
-    Lines(i32),
-}
-
-impl Serialize for ToolOutput {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::Compact => serializer.serialize_str("compact"),
-            Self::Full => serializer.serialize_str("full"),
-            Self::Lines(lines) => serializer.serialize_i32(*lines),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for ToolOutput {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Raw {
-            Name(String),
-            Lines(i64),
-        }
-
-        match Raw::deserialize(deserializer)? {
-            Raw::Name(name) => match name.as_str() {
-                "compact" => Ok(Self::Compact),
-                "full" => Ok(Self::Full),
-                other => Err(serde::de::Error::custom(format!(
-                    "invalid tool_output `{other}`: expected \"compact\", \"full\", or a positive number of lines"
-                ))),
-            },
-            // A zero or negative budget has no sensible meaning, and silently
-            // clamping would hide a typo, so reject it.
-            Raw::Lines(lines) => i32::try_from(lines)
-                .ok()
-                .filter(|lines| *lines > 0)
-                .map(Self::Lines)
-                .ok_or_else(|| {
-                    serde::de::Error::custom(format!(
-                        "invalid tool_output {lines}: a line budget must be between 1 and {}",
-                        i32::MAX
-                    ))
-                }),
-        }
-    }
 }
 
 /// Supported terminal file managers for the `/browse` command.

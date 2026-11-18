@@ -89,7 +89,7 @@ example `~/.claude/settings.json`) for Nori-spawned sessions — Nori's
 
 ```toml
 [tui]
-tool_output = "compact"   # or "full", or a line budget such as 15
+tool_output = "compact"   # or "full"
 ```
 
 `compact` (the default) shows each tool call as one scannable line: a status
@@ -99,16 +99,6 @@ underneath. Read-only commands and file reads/searches collapse into one
 `Explored N reads · M searches` line, and edits show only the file and line
 counts. `full` shows every command in full with syntax highlighting, all of its
 output, every exploring step, and edit diffs.
-
-A positive integer, for example `tool_output = 15`, keeps the compact view but
-lets a command show up to that many lines of output: the first lines, a faint
-`… +K lines` marker for the hidden middle, then the last lines. The marker
-counts toward the budget, so `15` shows 7 lines, the marker, and 7 lines.
-Output that fits is shown whole, and long lines wrap instead of being
-truncated. The budget counts source lines, not wrapped rows, and failed
-commands keep the red output colour. It applies to the output of a single
-command; exploring groups and edits render as in `compact`. Zero, negative, and
-non-integer values are a config error.
 
 The transcript view (Ctrl+T, or Ctrl+O when no plan is pinned) always shows the
 full form. The first-run directory-trust screen asks this question after the

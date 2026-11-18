@@ -165,9 +165,9 @@ impl ClientToolCell {
         }
     }
 
-    fn render(&self, width: u16, tool_output: ToolOutput) -> Vec<Line<'static>> {
+    fn render(&self, width: u16, full: bool) -> Vec<Line<'static>> {
         if self.is_exploring() {
-            return self.render_exploring_lines(width, tool_output == ToolOutput::Full);
+            return self.render_exploring_lines(width, full);
         }
         match self.snapshot.kind {
             ToolKind::Execute => {
@@ -175,10 +175,10 @@ impl ClientToolCell {
                     None => spinner(self.start_time, self.animations_enabled),
                     Some(_) => step_bullet(&self.snapshot),
                 };
-                execute_lines(&self.snapshot, bullet, width, tool_output)
+                execute_lines(&self.snapshot, bullet, width, full)
             }
             ToolKind::Create | ToolKind::Edit | ToolKind::Delete | ToolKind::Move => {
-                self.render_edit_lines(width, tool_output == ToolOutput::Full)
+                self.render_edit_lines(width, full)
             }
             ToolKind::Read
             | ToolKind::Search
@@ -241,12 +241,7 @@ impl ClientToolCell {
         }
         for step in steps {
             if step.kind == ToolKind::Execute {
-                let lines = execute_lines(
-                    step,
-                    step_bullet(step),
-                    width.saturating_sub(2),
-                    ToolOutput::Full,
-                );
+                let lines = execute_lines(step, step_bullet(step), width.saturating_sub(2), true);
                 out.extend(prefix_lines(lines, "  ".into(), "  ".into()));
                 continue;
             }
@@ -450,14 +445,13 @@ fn step_bullet(step: &ToolSnapshot) -> Span<'static> {
     }
 }
 
-/// `• Ran <command>` plus output: the last output line in compact form, a
-/// head/tail window of at most N source lines for `ToolOutput::Lines(N)`, and
-/// all of it, with the whole command, in full form.
+/// `• Ran <command>` plus output: the last output line in compact form, all
+/// of it in full form.
 fn execute_lines(
     snapshot: &ToolSnapshot,
     bullet: Span<'static>,
     width: u16,
-    tool_output: ToolOutput,
+    full: bool,
 ) -> Vec<Line<'static>> {
     let verb = if is_active_phase(&snapshot.phase) {
         "Running"
@@ -473,65 +467,28 @@ fn execute_lines(
     let header: Line<'static> = vec![bullet, " ".into(), verb.bold(), " ".into()].into();
     let output_width = usize::from(width).saturating_sub(4).max(1);
 
-    let budget = match tool_output {
-        ToolOutput::Compact => {
-            let available = usize::from(width).saturating_sub(header.width());
-            let mut header = header;
-            header.extend(compact_command(&command, available));
-            let mut lines = vec![header];
-            if let Some(last) = last_output_line(&output, failed, output_width) {
-                lines.extend(prefix_lines(vec![last], "  └ ".dim(), "    ".into()));
-            }
-            return lines;
-        }
-        ToolOutput::Lines(budget) => Some(usize::try_from(budget).unwrap_or(usize::MAX)),
-        ToolOutput::Full => None,
-    };
-
-    let mut lines = if budget.is_some() {
+    if !full {
         let available = usize::from(width).saturating_sub(header.width());
         let mut header = header;
         header.extend(compact_command(&command, available));
-        vec![header]
-    } else {
-        word_wrap_lines(
-            full_command_lines(&command),
-            RtOptions::new(usize::from(width).max(1))
-                .initial_indent(header)
-                .subsequent_indent("    ".into()),
-        )
-    };
+        let mut lines = vec![header];
+        if let Some(last) = last_output_line(&output, failed, output_width) {
+            lines.extend(prefix_lines(vec![last], "  └ ".dim(), "    ".into()));
+        }
+        return lines;
+    }
+
+    let mut lines = word_wrap_lines(
+        full_command_lines(&command),
+        RtOptions::new(usize::from(width).max(1))
+            .initial_indent(header)
+            .subsequent_indent("    ".into()),
+    );
     let output_opts = RtOptions::new(output_width).word_splitter(WordSplitter::NoHyphenation);
-    let wrap = |raw: &str, wrapped: &mut Vec<Line<'static>>| {
-        let line = codex_ansi_escape::ansi_escape_line(raw);
-        let line = if budget.is_some() && failed {
-            line.red()
-        } else {
-            line.dim()
-        };
-        push_owned_lines(&word_wrap_line(&line, output_opts.clone()), wrapped);
-    };
-    let source: Vec<&str> = output.trim_end().lines().collect();
     let mut wrapped = Vec::new();
-    match budget {
-        // The marker takes one of the N lines; the tail gets the odd one out.
-        Some(budget) if source.len() > budget => {
-            let head = budget.saturating_sub(1) / 2;
-            let tail = budget.saturating_sub(1) - head;
-            let hidden = source.len() - head - tail;
-            for raw in &source[..head] {
-                wrap(raw, &mut wrapped);
-            }
-            wrapped.push(Line::from(format!("… +{hidden} lines").dim()));
-            for raw in &source[source.len() - tail..] {
-                wrap(raw, &mut wrapped);
-            }
-        }
-        Some(_) | None => {
-            for raw in &source {
-                wrap(raw, &mut wrapped);
-            }
-        }
+    for raw in output.lines() {
+        let line = codex_ansi_escape::ansi_escape_line(raw).dim();
+        push_owned_lines(&word_wrap_line(&line, output_opts.clone()), &mut wrapped);
     }
     lines.extend(prefix_lines(wrapped, "  └ ".dim(), "    ".into()));
     lines
@@ -726,11 +683,11 @@ fn create_contextual_patch(
 
 impl HistoryCell for ClientToolCell {
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
-        self.render(width, self.tool_output)
+        self.render(width, self.tool_output == ToolOutput::Full)
     }
 
     fn transcript_lines(&self, width: u16) -> Vec<Line<'static>> {
-        self.render(width, ToolOutput::Full)
+        self.render(width, true)
     }
 }
 

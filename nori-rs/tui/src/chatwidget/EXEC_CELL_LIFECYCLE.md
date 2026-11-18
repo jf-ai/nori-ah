@@ -101,9 +101,7 @@ into one line.
 
 `ClientToolCell::display_lines` is the compact view unless
 `[tui] tool_output = "full"` (`NoriConfig::tool_output`), in which case it is
-the full view; a numeric `tool_output = N` (`ToolOutput::Lines`) keeps the
-compact view except that Execute shows up to `N` source lines of output around
-a `… +K lines` marker. `transcript_lines` (the Ctrl+T overlay) is always full. The
+the full view. `transcript_lines` (the Ctrl+T overlay) is always full. The
 `nori attach` frontend builds cells without `with_tool_output`, so it always
 renders compact.
 

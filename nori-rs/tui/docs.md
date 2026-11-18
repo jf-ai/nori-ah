@@ -544,11 +544,7 @@ Every ACP tool call renders through
 [`bash::summarize`](../harness/src/bash.rs) parser. The cell's
 `display_lines` is the compact inline view and `transcript_lines` the full
 view; `[tui] tool_output = "full"` (`NoriConfig::tool_output`, passed in by the
-chat widget through `with_tool_output`) makes the inline view full as well. A positive number `N` (`ToolOutput::Lines`)
-keeps the compact view but shows up to `N` source lines of Execute output as a
-head/tail window around a faint `… +K lines` marker (the marker counts toward
-`N`; lines wrap like the full view; failures stay red); other cell types render
-compact.
+chat widget through `with_tool_output`) makes the inline view full as well.
 `nori attach` builds cells without that setting, so it always renders compact.
 
 Compact output is one scannable line per call: a status dot that is the only

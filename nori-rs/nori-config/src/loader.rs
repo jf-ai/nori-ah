@@ -725,45 +725,6 @@ auto_worktree = false
         std::fs::write(&config_path, "[tui]\ntool_output = \"full\"\n").unwrap();
         let config = NoriConfig::load_from_path(&config_path).unwrap();
         assert_eq!(config.tool_output, crate::ToolOutput::Full);
-
-        std::fs::write(&config_path, "[tui]\ntool_output = \"compact\"\n").unwrap();
-        let config = NoriConfig::load_from_path(&config_path).unwrap();
-        assert_eq!(config.tool_output, crate::ToolOutput::Compact);
-
-        std::fs::write(&config_path, "[tui]\ntool_output = 15\n").unwrap();
-        let config = NoriConfig::load_from_path(&config_path).unwrap();
-        assert_eq!(config.tool_output, crate::ToolOutput::Lines(15));
-    }
-
-    #[test]
-    fn test_tool_output_rejects_invalid_values() {
-        let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join(CONFIG_FILE);
-
-        for value in ["0", "-3", "\"verbose\"", "2.5", "4294967296"] {
-            std::fs::write(&config_path, format!("[tui]\ntool_output = {value}\n")).unwrap();
-            assert!(
-                NoriConfig::load_from_path(&config_path).is_err(),
-                "tool_output = {value} should be rejected"
-            );
-        }
-    }
-
-    #[test]
-    fn test_tool_output_round_trips_through_toml() {
-        #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
-        struct Wrapper {
-            tool_output: crate::ToolOutput,
-        }
-        for tool_output in [
-            crate::ToolOutput::Compact,
-            crate::ToolOutput::Full,
-            crate::ToolOutput::Lines(15),
-        ] {
-            let wrapper = Wrapper { tool_output };
-            let text = toml::to_string(&wrapper).unwrap();
-            assert_eq!(toml::from_str::<Wrapper>(&text).unwrap(), wrapper);
-        }
     }
 
     #[test]
