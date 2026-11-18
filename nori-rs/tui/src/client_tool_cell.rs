@@ -73,7 +73,8 @@ impl ClientToolCell {
         self
     }
 
-    /// Cap each command's output in the full inline view at this many lines
+    /// Cap each command's output in the full inline view, and each generic
+    /// cell's details in either view, at this many lines
     /// (`[tui] tool_output_lines`). The transcript view is never capped.
     pub(crate) fn with_output_line_cap(mut self, output_line_cap: Option<i32>) -> Self {
         self.output_line_cap = output_line_cap;
@@ -193,7 +194,7 @@ impl ClientToolCell {
             | ToolKind::Search
             | ToolKind::Fetch
             | ToolKind::Think
-            | ToolKind::Other(_) => self.render_generic_lines(),
+            | ToolKind::Other(_) => self.render_generic_lines(output_line_cap),
         }
     }
 
@@ -399,7 +400,9 @@ impl ClientToolCell {
         lines
     }
 
-    fn render_generic_lines(&self) -> Vec<Line<'static>> {
+    /// Generic cells look the same in compact and full, so `output_line_cap`
+    /// applies to their detail lines in both.
+    fn render_generic_lines(&self, output_line_cap: Option<i32>) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
         let bullet = if self.is_active() {
             spinner(self.start_time, self.animations_enabled)
@@ -448,6 +451,11 @@ impl ClientToolCell {
             }
         }
 
+        let (head, hidden, _) = output_window(details.len(), output_line_cap);
+        if hidden > 0 {
+            details.splice(head..head + hidden, [format!("… +{hidden} lines")]);
+        }
+
         for (idx, detail) in details.into_iter().enumerate() {
             let prefix = if idx == 0 { "  └ " } else { "    " };
             lines.push(Line::from(vec![prefix.dim(), detail.dim()]));
@@ -462,6 +470,21 @@ fn step_bullet(step: &ToolSnapshot) -> Span<'static> {
         Some(true) => "•".green().bold(),
         Some(false) => "•".red().bold(),
         None => "•".dim(),
+    }
+}
+
+/// Splits `len` lines for `[tui] tool_output_lines`: how many to show from the
+/// start, how many to hide behind a `… +K lines` marker, and how many to show
+/// from the end. The marker takes one of the cap's lines; the tail gets the
+/// odd one out. Without a cap, or when everything fits, nothing is hidden.
+fn output_window(len: usize, output_line_cap: Option<i32>) -> (usize, usize, usize) {
+    match output_line_cap.and_then(|cap| usize::try_from(cap).ok()) {
+        Some(cap) if len > cap => {
+            let head = cap.saturating_sub(1) / 2;
+            let tail = cap.saturating_sub(1) - head;
+            (head, len - head - tail, tail)
+        }
+        Some(_) | None => (len, 0, 0),
     }
 }
 
@@ -512,16 +535,8 @@ fn execute_lines(
         push_owned_lines(&word_wrap_line(&line, output_opts.clone()), wrapped);
     };
     let source: Vec<&str> = output.lines().collect();
-    // The cap counts source lines, not wrapped rows. The marker takes one of
-    // the N lines; the tail gets the odd one out.
-    let (head, tail) = match output_line_cap.and_then(|cap| usize::try_from(cap).ok()) {
-        Some(cap) if source.len() > cap => {
-            let head = cap.saturating_sub(1) / 2;
-            (head, cap.saturating_sub(1) - head)
-        }
-        Some(_) | None => (source.len(), 0),
-    };
-    let hidden = source.len() - head - tail;
+    // The cap counts source lines, not wrapped rows.
+    let (head, hidden, tail) = output_window(source.len(), output_line_cap);
     let mut wrapped = Vec::new();
     for raw in &source[..head] {
         wrap(raw, &mut wrapped);

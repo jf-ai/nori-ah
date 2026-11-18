@@ -587,6 +587,44 @@ fn output_line_cap_leaves_edit_diffs_whole() {
     assert_eq!(rendered, text(&cell(snapshot).transcript_lines(120), 120));
 }
 
+fn generic(text: &str) -> ToolSnapshot {
+    ToolSnapshot {
+        call_id: "g".into(),
+        title: "memory_search".into(),
+        kind: ToolKind::Other("memory_search".into()),
+        phase: ToolPhase::Completed,
+        locations: vec![],
+        invocation: None,
+        artifacts: vec![Artifact::Text { text: text.into() }],
+        raw_input: None,
+        raw_output: None,
+        owner_request_id: None,
+    }
+}
+
+#[test]
+fn output_line_cap_windows_generic_cells_in_compact_and_full() {
+    let snapshot = generic(&numbered_lines(40));
+    let compact_cell = cell(snapshot.clone()).with_output_line_cap(Some(5));
+    let full_cell = cell(snapshot)
+        .with_tool_output(ToolOutput::Full)
+        .with_output_line_cap(Some(5));
+    assert_eq!(
+        text(&full_cell.display_lines(80), 80),
+        text(&compact_cell.display_lines(80), 80)
+    );
+    assert_snapshot!(text(&compact_cell.display_lines(80), 80));
+}
+
+#[test]
+fn output_line_cap_never_applies_to_generic_transcripts() {
+    let snapshot = generic(&numbered_lines(40));
+    let capped = cell(snapshot.clone()).with_output_line_cap(Some(5));
+    let rendered = text(&capped.transcript_lines(80), 80);
+    assert_eq!(rendered.lines().count(), 41, "{rendered}");
+    assert_eq!(rendered, text(&cell(snapshot).transcript_lines(80), 80));
+}
+
 #[test]
 fn completed_command_without_output_is_one_line() {
     let cell = cell(execute(

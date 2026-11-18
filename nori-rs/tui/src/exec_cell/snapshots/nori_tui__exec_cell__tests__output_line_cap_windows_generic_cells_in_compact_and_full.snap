@@ -1,0 +1,10 @@
+---
+source: tui/src/exec_cell/tests.rs
+expression: "text(&compact_cell.display_lines(80), 80)"
+---
+• Tool [completed]: memory_search (memory_search)
+  └ line 1
+    line 2
+    … +36 lines
+    line 39
+    line 40

@@ -90,7 +90,7 @@ example `~/.claude/settings.json`) for Nori-spawned sessions — Nori's
 ```toml
 [tui]
 tool_output = "compact"   # or "full"
-tool_output_lines = 15    # optional: cap each command's output in "full"
+tool_output_lines = 15    # optional: cap long tool output (see below)
 ```
 
 `compact` (the default) shows each tool call as one scannable line: a status
@@ -107,7 +107,9 @@ faint `… +K lines` marker; the marker counts toward the cap, so `15` shows 7
 lines, the marker, and 7 lines. The cap counts output lines before wrapping,
 applies to commands inside `Explored` groups too, and never applies to edit
 diffs or the transcript view. Leave it unset (or set zero or less) for
-uncapped output. It has no effect in `compact`.
+uncapped output. Generic tool calls (fetches, thinking, and tools Nori has no
+dedicated display for) look the same in both modes and are capped the same way
+in both; in `compact`, the cap affects only them.
 
 The transcript view (Ctrl+T, or Ctrl+O when no plan is pinned) always shows the
 full form. The first-run directory-trust screen asks this question after the
