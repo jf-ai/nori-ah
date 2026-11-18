@@ -263,8 +263,8 @@ impl ClientToolCell {
             (ToolKind::Execute, Some(Invocation::Command { command })) => {
                 compact_command(command, max_width)
             }
-            (ToolKind::Read, Some(Invocation::Read { path })) => {
-                let mut spans = vec!["Read".cyan(), " ".into(), read_display_name(path).into()];
+            (ToolKind::Read, Some(Invocation::Read { path: file })) => {
+                let mut spans = vec!["Read".cyan(), " ".into(), path(file).into()];
                 // Optional adapter convention: `rawOutput.lines = {start, end, total?}`.
                 let lines = step.raw_output.as_ref().and_then(|out| out.get("lines"));
                 let bound = |key| {
@@ -689,13 +689,6 @@ impl HistoryCell for ClientToolCell {
     fn transcript_lines(&self, width: u16) -> Vec<Line<'static>> {
         self.render(width, true)
     }
-}
-
-/// Display name for a Read path: the file name when there is one.
-fn read_display_name(path: &std::path::Path) -> String {
-    path.file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.display().to_string())
 }
 
 fn is_active_phase(phase: &crate::presentation::ToolPhase) -> bool {
