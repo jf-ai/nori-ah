@@ -4,7 +4,7 @@ expression: compact(&ranged)
 ---
 --- 120 ---
 • Explored 1 read
-  └ Read foo.rs · lines 5-19 of 240
+  └ Read src/foo.rs · lines 5-19 of 240
 --- 80 ---
 • Explored 1 read
-  └ Read foo.rs · lines 5-19 of 240
+  └ Read src/foo.rs · lines 5-19 of 240
