@@ -4,7 +4,7 @@ expression: compact(&absent)
 ---
 --- 120 ---
 • Explored 1 read
-  └ Read foo.rs
+  └ Read src/foo.rs
 --- 80 ---
 • Explored 1 read
-  └ Read foo.rs
+  └ Read src/foo.rs
