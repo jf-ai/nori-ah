@@ -569,12 +569,12 @@ impl ChatWidget {
             None
         };
 
-        let agent = self.config.active_agent.clone();
+        let agent = &self.config.active_agent;
         if agent.is_empty() {
             return;
         }
 
-        let title = crate::terminal_title::compose_title(&agent, spinner_frame);
+        let title = crate::terminal_title::compose_title(agent, spinner_frame);
 
         // Skip redundant writes.
         if self.last_terminal_title.as_deref() == Some(&title) {
