@@ -380,6 +380,104 @@ fn full_setting_renders_full_view_inline() {
     );
 }
 
+fn numbered_lines(count: i32) -> String {
+    (1..=count)
+        .map(|n| format!("line {n}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn output_line_cap_windows_long_output_in_full_view() {
+    let cell = cell(execute(
+        "s",
+        ToolPhase::Completed,
+        CHAINED,
+        Some((&numbered_lines(40), 0)),
+    ))
+    .with_tool_output(ToolOutput::Full)
+    .with_output_line_cap(Some(7));
+    assert_snapshot!(format!(
+        "--- 120 ---\n{}\n--- 80 ---\n{}",
+        text(&cell.display_lines(120), 120),
+        text(&cell.display_lines(80), 80)
+    ));
+}
+
+#[test]
+fn output_line_cap_shows_output_that_fits_in_full() {
+    let snapshot = execute(
+        "s",
+        ToolPhase::Completed,
+        "seq 1 7",
+        Some((&numbered_lines(7), 0)),
+    );
+    let capped = cell(snapshot.clone())
+        .with_tool_output(ToolOutput::Full)
+        .with_output_line_cap(Some(7));
+    assert_eq!(
+        text(&capped.display_lines(120), 120),
+        text(&cell(snapshot).transcript_lines(120), 120)
+    );
+}
+
+#[test]
+fn output_line_cap_never_applies_to_the_transcript() {
+    let snapshot = execute(
+        "s",
+        ToolPhase::Completed,
+        "seq 1 40",
+        Some((&numbered_lines(40), 0)),
+    );
+    let capped = cell(snapshot.clone())
+        .with_tool_output(ToolOutput::Full)
+        .with_output_line_cap(Some(7));
+    assert_eq!(
+        text(&capped.transcript_lines(120), 120),
+        text(&cell(snapshot).transcript_lines(120), 120)
+    );
+}
+
+#[test]
+fn output_line_cap_applies_to_commands_in_explore_groups() {
+    let mut cell = cell(execute(
+        "cat-1",
+        ToolPhase::Completed,
+        "cat src/main.rs",
+        Some((&numbered_lines(40), 0)),
+    ))
+    .with_tool_output(ToolOutput::Full)
+    .with_output_line_cap(Some(5));
+    cell.mark_exploring();
+    assert_snapshot!(text(&cell.display_lines(80), 80));
+}
+
+#[test]
+fn output_line_cap_leaves_edit_diffs_whole() {
+    let snapshot = ToolSnapshot {
+        call_id: "e".into(),
+        title: "Edit src/lib.rs".into(),
+        kind: ToolKind::Edit,
+        phase: ToolPhase::Completed,
+        locations: vec![],
+        invocation: None,
+        artifacts: vec![Artifact::Diff(FileChange {
+            path: cwd().join("src/lib.rs"),
+            old_text: Some(numbered_lines(20)),
+            new_text: numbered_lines(20).replace("line ", "row "),
+        })],
+        raw_input: None,
+        raw_output: None,
+        owner_request_id: None,
+    };
+    let capped = cell(snapshot.clone())
+        .with_tool_output(ToolOutput::Full)
+        .with_output_line_cap(Some(3));
+    let rendered = text(&capped.display_lines(120), 120);
+    assert!(rendered.lines().count() > 20, "{rendered}");
+    assert_eq!(rendered, text(&cell(snapshot).transcript_lines(120), 120));
+}
+
 #[test]
 fn completed_command_without_output_is_one_line() {
     let cell = cell(execute(

@@ -101,7 +101,11 @@ into one line.
 
 `ClientToolCell::display_lines` is the compact view unless
 `[tui] tool_output = "full"` (`NoriConfig::tool_output`), in which case it is
-the full view. `transcript_lines` (the Ctrl+T overlay) is always full. The
+the full view. `[tui] tool_output_lines` (`with_output_line_cap`) caps each
+command's output in that full inline view to a head/tail window around a
+`… +K lines` marker, including commands inside exploring groups; edit diffs are
+never capped. `transcript_lines` (the Ctrl+T overlay) is always full and
+uncapped. The
 `nori attach` frontend builds cells without `with_tool_output`, so it always
 renders compact.
 

@@ -1274,7 +1274,8 @@ impl ChatWidget {
             self.config.cwd.clone(),
             self.config.animations,
         )
-        .with_tool_output(self.config.tool_output);
+        .with_tool_output(self.config.tool_output)
+        .with_output_line_cap(self.config.tool_output_lines);
         if is_new_exploring {
             cell.mark_exploring();
         }

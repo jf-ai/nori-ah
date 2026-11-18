@@ -232,6 +232,7 @@ impl NoriConfig {
             skillset_per_session,
             file_manager: toml.tui.file_manager,
             tool_output: toml.tui.tool_output.unwrap_or_default(),
+            tool_output_lines: toml.tui.tool_output_lines.filter(|lines| *lines > 0),
             pinned_plan_drawer: toml.tui.pinned_plan_drawer.unwrap_or(false),
             custom_working_messages: toml.tui.custom_working_messages.unwrap_or(true),
             custom_working_message_list: toml
@@ -725,6 +726,23 @@ auto_worktree = false
         std::fs::write(&config_path, "[tui]\ntool_output = \"full\"\n").unwrap();
         let config = NoriConfig::load_from_path(&config_path).unwrap();
         assert_eq!(config.tool_output, crate::ToolOutput::Full);
+    }
+
+    #[test]
+    fn test_tool_output_lines_from_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(CONFIG_FILE);
+
+        for (toml, expected) in [
+            ("", None),
+            ("[tui]\ntool_output_lines = 15\n", Some(15)),
+            ("[tui]\ntool_output_lines = 0\n", None),
+            ("[tui]\ntool_output_lines = -3\n", None),
+        ] {
+            std::fs::write(&config_path, toml).unwrap();
+            let config = NoriConfig::load_from_path(&config_path).unwrap();
+            assert_eq!(config.tool_output_lines, expected, "{toml:?}");
+        }
     }
 
     #[test]

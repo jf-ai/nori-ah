@@ -90,6 +90,7 @@ example `~/.claude/settings.json`) for Nori-spawned sessions — Nori's
 ```toml
 [tui]
 tool_output = "compact"   # or "full"
+tool_output_lines = 15    # optional: cap each command's output in "full"
 ```
 
 `compact` (the default) shows each tool call as one scannable line: a status
@@ -99,6 +100,14 @@ underneath. Read-only commands and file reads/searches collapse into one
 `Explored N reads · M searches` line, and edits show only the file and line
 counts. `full` shows every command in full with syntax highlighting, all of its
 output, every exploring step, and edit diffs.
+
+`tool_output_lines` caps how much command output `full` shows inline. A command
+with more output lines than the cap shows its first and last lines around a
+faint `… +K lines` marker; the marker counts toward the cap, so `15` shows 7
+lines, the marker, and 7 lines. The cap counts output lines before wrapping,
+applies to commands inside `Explored` groups too, and never applies to edit
+diffs or the transcript view. Leave it unset (or set zero or less) for
+uncapped output. It has no effect in `compact`.
 
 The transcript view (Ctrl+T, or Ctrl+O when no plan is pinned) always shows the
 full form. The first-run directory-trust screen asks this question after the
