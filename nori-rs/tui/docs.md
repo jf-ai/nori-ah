@@ -545,6 +545,9 @@ Every ACP tool call renders through
 `display_lines` is the compact inline view and `transcript_lines` the full
 view; `[tui] tool_output = "full"` (`NoriConfig::tool_output`, passed in by the
 chat widget through `with_tool_output`) makes the inline view full as well.
+`[tui] tool_output_lines` (`with_output_line_cap`) caps each command's output in
+that full inline view at N source lines, as a head/tail window around a faint
+`… +K lines` marker; edit diffs and the transcript view are never capped.
 `nori attach` builds cells without that setting, so it always renders compact.
 
 Compact output is one scannable line per call: a status dot that is the only

@@ -2052,6 +2052,9 @@ pub struct TuiConfigToml {
     /// How tool calls render inline (the transcript view is always full).
     pub tool_output: Option<ToolOutput>,
 
+    /// Cap each command's output in the full inline view at this many lines.
+    pub tool_output_lines: Option<i32>,
+
     /// Pin plan updates to a drawer in the viewport instead of history cells.
     pub pinned_plan_drawer: Option<bool>,
 
@@ -2295,6 +2298,10 @@ pub struct NoriConfig {
     /// How tool calls render inline (the transcript view is always full).
     pub tool_output: ToolOutput,
 
+    /// Most output lines a command shows in the full inline view; `None` is
+    /// uncapped. Only positive values load.
+    pub tool_output_lines: Option<i32>,
+
     /// Pin plan updates to a drawer in the viewport instead of history cells.
     pub pinned_plan_drawer: bool,
 
@@ -2419,6 +2426,7 @@ impl Default for NoriConfig {
             file_manager: None,
             pinned_plan_drawer: false,
             tool_output: ToolOutput::default(),
+            tool_output_lines: None,
             custom_working_messages: true,
             custom_working_message_list: Vec::new(),
             footer_segment_config: FooterSegmentConfig::default(),

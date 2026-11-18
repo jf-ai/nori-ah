@@ -41,6 +41,7 @@ pub(crate) struct ClientToolCell {
     animations_enabled: bool,
     start_time: Option<Instant>,
     tool_output: ToolOutput,
+    output_line_cap: Option<i32>,
 }
 
 impl ClientToolCell {
@@ -63,11 +64,19 @@ impl ClientToolCell {
             animations_enabled,
             start_time,
             tool_output: ToolOutput::Compact,
+            output_line_cap: None,
         }
     }
 
     pub(crate) fn with_tool_output(mut self, tool_output: ToolOutput) -> Self {
         self.tool_output = tool_output;
+        self
+    }
+
+    /// Cap each command's output in the full inline view at this many lines
+    /// (`[tui] tool_output_lines`). The transcript view is never capped.
+    pub(crate) fn with_output_line_cap(mut self, output_line_cap: Option<i32>) -> Self {
+        self.output_line_cap = output_line_cap;
         self
     }
 
@@ -165,9 +174,9 @@ impl ClientToolCell {
         }
     }
 
-    fn render(&self, width: u16, full: bool) -> Vec<Line<'static>> {
+    fn render(&self, width: u16, full: bool, output_line_cap: Option<i32>) -> Vec<Line<'static>> {
         if self.is_exploring() {
-            return self.render_exploring_lines(width, full);
+            return self.render_exploring_lines(width, full, output_line_cap);
         }
         match self.snapshot.kind {
             ToolKind::Execute => {
@@ -175,7 +184,7 @@ impl ClientToolCell {
                     None => spinner(self.start_time, self.animations_enabled),
                     Some(_) => step_bullet(&self.snapshot),
                 };
-                execute_lines(&self.snapshot, bullet, width, full)
+                execute_lines(&self.snapshot, bullet, width, full, output_line_cap)
             }
             ToolKind::Create | ToolKind::Edit | ToolKind::Delete | ToolKind::Move => {
                 self.render_edit_lines(width, full)
@@ -188,7 +197,12 @@ impl ClientToolCell {
         }
     }
 
-    fn render_exploring_lines(&self, width: u16, full: bool) -> Vec<Line<'static>> {
+    fn render_exploring_lines(
+        &self,
+        width: u16,
+        full: bool,
+        output_line_cap: Option<i32>,
+    ) -> Vec<Line<'static>> {
         let steps = if self.exploring_snapshots.is_empty() {
             std::slice::from_ref(&self.snapshot)
         } else {
@@ -241,7 +255,13 @@ impl ClientToolCell {
         }
         for step in steps {
             if step.kind == ToolKind::Execute {
-                let lines = execute_lines(step, step_bullet(step), width.saturating_sub(2), true);
+                let lines = execute_lines(
+                    step,
+                    step_bullet(step),
+                    width.saturating_sub(2),
+                    true,
+                    output_line_cap,
+                );
                 out.extend(prefix_lines(lines, "  ".into(), "  ".into()));
                 continue;
             }
@@ -446,12 +466,14 @@ fn step_bullet(step: &ToolSnapshot) -> Span<'static> {
 }
 
 /// `• Ran <command>` plus output: the last output line in compact form, all
-/// of it in full form.
+/// of it in full form. With `output_line_cap` = N, full form shows at most N
+/// output lines: the first and last lines around a `… +K lines` marker.
 fn execute_lines(
     snapshot: &ToolSnapshot,
     bullet: Span<'static>,
     width: u16,
     full: bool,
+    output_line_cap: Option<i32>,
 ) -> Vec<Line<'static>> {
     let verb = if is_active_phase(&snapshot.phase) {
         "Running"
@@ -485,10 +507,30 @@ fn execute_lines(
             .subsequent_indent("    ".into()),
     );
     let output_opts = RtOptions::new(output_width).word_splitter(WordSplitter::NoHyphenation);
-    let mut wrapped = Vec::new();
-    for raw in output.lines() {
+    let wrap = |raw: &str, wrapped: &mut Vec<Line<'static>>| {
         let line = codex_ansi_escape::ansi_escape_line(raw).dim();
-        push_owned_lines(&word_wrap_line(&line, output_opts.clone()), &mut wrapped);
+        push_owned_lines(&word_wrap_line(&line, output_opts.clone()), wrapped);
+    };
+    let source: Vec<&str> = output.lines().collect();
+    // The cap counts source lines, not wrapped rows. The marker takes one of
+    // the N lines; the tail gets the odd one out.
+    let (head, tail) = match output_line_cap.and_then(|cap| usize::try_from(cap).ok()) {
+        Some(cap) if source.len() > cap => {
+            let head = cap.saturating_sub(1) / 2;
+            (head, cap.saturating_sub(1) - head)
+        }
+        Some(_) | None => (source.len(), 0),
+    };
+    let hidden = source.len() - head - tail;
+    let mut wrapped = Vec::new();
+    for raw in &source[..head] {
+        wrap(raw, &mut wrapped);
+    }
+    if hidden > 0 {
+        wrapped.push(format!("… +{hidden} lines").dim().into());
+    }
+    for raw in &source[source.len() - tail..] {
+        wrap(raw, &mut wrapped);
     }
     lines.extend(prefix_lines(wrapped, "  └ ".dim(), "    ".into()));
     lines
@@ -683,11 +725,15 @@ fn create_contextual_patch(
 
 impl HistoryCell for ClientToolCell {
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
-        self.render(width, self.tool_output == ToolOutput::Full)
+        self.render(
+            width,
+            self.tool_output == ToolOutput::Full,
+            self.output_line_cap,
+        )
     }
 
     fn transcript_lines(&self, width: u16) -> Vec<Line<'static>> {
-        self.render(width, true)
+        self.render(width, true, None)
     }
 }
 

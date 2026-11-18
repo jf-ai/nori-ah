@@ -1,0 +1,11 @@
+---
+source: tui/src/exec_cell/tests.rs
+expression: "text(&cell.display_lines(80), 80)"
+---
+• Explored 1 read
+  • Ran cat src/main.rs
+    └ line 1
+      line 2
+      … +36 lines
+      line 39
+      line 40
