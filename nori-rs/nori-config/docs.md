@@ -40,7 +40,8 @@ one source of truth.
 by default, or `Full`). The TUI's tool call cells read it to choose the inline
 history view; the transcript overlay always shows the full view.
 `[tui] tool_output_lines` resolves to `NoriConfig::tool_output_lines`, the
-full inline view's per-command output cap; values below 1 load as `None`
+inline line cap for command output in the full view and for generic tool cells
+in either view; values below 1 load as `None`
 (uncapped). The TUI's
 directory-trust onboarding step can write this key with `NoriConfigEdits`.
 
