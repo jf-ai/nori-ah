@@ -106,7 +106,8 @@ command's output in that full inline view to a head/tail window around a
 `… +K lines` marker, including commands inside exploring groups; generic cells
 (which render the same in both modes) are capped the same way in compact and
 full; edit diffs are never capped. `transcript_lines` (the Ctrl+T overlay) is always full and
-uncapped. The
+ignores `tool_output_lines`; the overlay itself still cuts each cell at
+`TRANSCRIPT_HISTORY_MAX_LINES` rows ([`pager_overlay`](../pager_overlay.rs)). The
 `nori attach` frontend builds cells without `with_tool_output`, so it always
 renders compact.
 

@@ -545,7 +545,8 @@ chat widget through `with_tool_output`) makes the inline view full as well.
 `[tui] tool_output_lines` (`with_output_line_cap`) caps each command's output in
 that full inline view at N source lines, as a head/tail window around a faint
 `… +K lines` marker. Generic cells render the same in both modes and are capped
-in both; edit diffs and the transcript view are never capped.
+in both. It never applies to edit diffs or to `transcript_lines`; the transcript
+overlay still applies its own per-cell row cap (below).
 `nori attach` builds cells without that setting, so it always renders compact.
 
 Compact output is one scannable line per call: a status dot that is the only
