@@ -106,7 +106,8 @@ with more output lines than the cap shows its first and last lines around a
 faint `… +K lines` marker; the marker counts toward the cap, so `15` shows 7
 lines, the marker, and 7 lines. The cap counts output lines before wrapping,
 applies to commands inside `Explored` groups too, and never applies to edit
-diffs or the transcript view. Leave it unset (or set zero or less) for
+diffs or the transcript view (which keeps its own limit: each cell shows its
+first 20 rows there, then `┄ N more lines`). Leave it unset (or set zero or less) for
 uncapped output. Generic tool calls (fetches, thinking, and tools Nori has no
 dedicated display for) look the same in both modes and are capped the same way
 in both; in `compact`, the cap affects only them.

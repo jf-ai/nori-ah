@@ -75,7 +75,8 @@ impl ClientToolCell {
 
     /// Cap each command's output in the full inline view, and each generic
     /// cell's details in either view, at this many lines
-    /// (`[tui] tool_output_lines`). The transcript view is never capped.
+    /// (`[tui] tool_output_lines`). `transcript_lines` ignores this cap; the
+    /// transcript overlay applies its own per-cell row limit.
     pub(crate) fn with_output_line_cap(mut self, output_line_cap: Option<i32>) -> Self {
         self.output_line_cap = output_line_cap;
         self
